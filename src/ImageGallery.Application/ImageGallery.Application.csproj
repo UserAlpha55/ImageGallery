@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ImageGallery.Domain\ImageGallery.Domain.csproj" />
+    <ProjectReference Include="..\ImageGallery.Infrastructure\ImageGallery.Infrastructure.csproj" />
+    <ProjectReference Include="..\ImageGallery.Contracts\ImageGallery.Contracts.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

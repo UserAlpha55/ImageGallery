@@ -1,0 +1,123 @@
+@page "/albums"
+@rendermode InteractiveServer
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudGrid>
+        <MudItem xs="12" Class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h4">Albums</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="ShowCreateDialog">
+                <MudIcon Left="true" Icon="@Icons.Material.Filled.Add" />
+                New Album
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @if (loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (!albums.Any())
+    {
+        <MudAlert Severity="Severity.Info">
+            No albums yet. Create one to organize your images.
+        </MudAlert>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var album in albums)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3" key="@album.Id">
+                    <MudCard OnClick="() => NavigateToAlbum(album.Id)"
+                             Class="album-card" Style="cursor:pointer">
+                        @if (album.CoverImageUrl is not null)
+                        {
+                            <MudCardMedia Image="@album.CoverImageUrl" Height="160" />
+                        }
+                        else
+                        {
+                            <div style="height:160px;background:#333;display:flex;align-items:center;justify-content:center">
+                                <MudIcon Icon="@Icons.Material.Filled.PhotoLibrary" Size="Size.Large" />
+                            </div>
+                        }
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6">@album.Name</MudText>
+                            @if (album.Description is not null)
+                            {
+                                <MudText Typo="Typo.body2" Class="text-secondary">@album.Description</MudText>
+                            }
+                            <MudChip T="string" Size="Size.Small" Color="Color.Tertiary" Class="mt-2">
+                                @album.ImageCount image@(album.ImageCount != 1 ? "s" : "")
+                            </MudChip>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Color="Color.Error"
+                                           OnClick="@(() => DeleteAlbum(album.Id))" />
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+<MudDialog @bind-IsVisible="@dialogVisible">
+    <DialogContent>
+        <MudTextField @bind-Value="newAlbumName" Label="Album Name"
+                      Variant="Variant.Outlined" FullWidth="true" Class="mb-3" />
+        <MudTextField @bind-Value="newAlbumDescription" Label="Description (optional)"
+                      Variant="Variant.Outlined" FullWidth="true" Lines="3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CancelCreate">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="CreateAlbum" Disabled="string.IsNullOrWhiteSpace(newAlbumName)">
+            Create
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Inject] private IGalleryClient Client { get; set; } = null!;
+    [Inject] private NavigationManager Nav { get; set; } = null!;
+
+    private List<AlbumDto> albums = new();
+    private bool loading = true;
+    private bool dialogVisible;
+    private string newAlbumName = string.Empty;
+    private string? newAlbumDescription;
+
+    protected override async Task OnInitializedAsync()
+    {
+        albums = await Client.GetAlbumsAsync();
+        loading = false;
+    }
+
+    private void ShowCreateDialog() => dialogVisible = true;
+
+    private void CancelCreate() => dialogVisible = false;
+
+    private async Task CreateAlbum()
+    {
+        if (string.IsNullOrWhiteSpace(newAlbumName)) return;
+        await Client.CreateAlbumAsync(new CreateAlbumRequest
+        {
+            Name = newAlbumName,
+            Description = newAlbumDescription
+        });
+        dialogVisible = false;
+        newAlbumName = string.Empty;
+        newAlbumDescription = null;
+        albums = await Client.GetAlbumsAsync();
+    }
+
+    private void NavigateToAlbum(Guid id) => Nav.NavigateTo($"/albums/{id}");
+
+    private async Task DeleteAlbum(Guid id)
+    {
+        await Client.DeleteAlbumAsync(id);
+        albums = await Client.GetAlbumsAsync();
+    }
+}

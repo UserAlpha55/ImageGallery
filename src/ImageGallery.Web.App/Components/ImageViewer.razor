@@ -1,0 +1,31 @@
+@if (ImageUrl is not null)
+{
+    <MudOverlay Visible="true" OnClick="HandleBackdropClick">
+        <div class="image-viewer-overlay" @onclick:stopPropagation>
+            <div class="image-viewer-header">
+                <MudText Typo="Typo.body2" Class="text-white">@FileName</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit"
+                               OnClick="Close" />
+            </div>
+            <div class="image-viewer-content">
+                <img src="@ImageUrl" alt="@FileName"
+                     style="max-width:90vw;max-height:80vh;object-fit:contain;
+                            filter: @FilterStyle" @onclick:stopPropagation />
+            </div>
+        </div>
+    </MudOverlay>
+}
+
+@code {
+    [Parameter] public string? ImageUrl { get; set; }
+    [Parameter] public string? FileName { get; set; }
+    [Parameter] public string FilterStyle { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private async Task Close() => await OnClose.InvokeAsync();
+
+    private async Task HandleBackdropClick()
+    {
+        await Close();
+    }
+}

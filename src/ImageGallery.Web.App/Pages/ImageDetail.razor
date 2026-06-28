@@ -1,0 +1,185 @@
+@page "/images/{Id:guid}"
+@rendermode InteractiveServer
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    @if (image is null)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else
+    {
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudPaper Elevation="2" Class="pa-2">
+                    <img src="@image.Url" alt="@image.FileName"
+                         style="width:100%;height:auto;max-height:70vh;object-fit:contain;
+                                filter: @GetFilterStyle()" />
+                </MudPaper>
+
+                <MudPaper Class="pa-4 mt-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-2">Image Filters</MudText>
+                    <MudGrid>
+                        <MudItem xs="6" md="3">
+                            <MudSlider @bind-Value="filterGray" Min="0" Max="100" Immediate="true">
+                                <Label Content="Grayscale" />
+                            </MudSlider>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudSlider @bind-Value="filterSepia" Min="0" Max="100" Immediate="true">
+                                <Label Content="Sepia" />
+                            </MudSlider>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudSlider @bind-Value="filterBrightness" Min="0" Max="200" Immediate="true">
+                                <Label Content="Brightness" />
+                            </MudSlider>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudSlider @bind-Value="filterContrast" Min="0" Max="200" Immediate="true">
+                                <Label Content="Contrast" />
+                            </MudSlider>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudSlider @bind-Value="filterBlur" Min="0" Max="10" Immediate="true">
+                                <Label Content="Blur" />
+                            </MudSlider>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudSlider @bind-Value="filterHue" Min="0" Max="360" Immediate="true">
+                                <Label Content="Hue Rotate" />
+                            </MudSlider>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudSlider @bind-Value="filterSaturate" Min="0" Max="200" Immediate="true">
+                                <Label Content="Saturate" />
+                            </MudSlider>
+                        </MudItem>
+                        <MudItem xs="6" md="3" Class="d-flex align-center">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Warning"
+                                       OnClick="ResetFilters" FullWidth="true">
+                                Reset
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h5">@image.FileName</MudText>
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.body2">
+                        <strong>Size:</strong> @FormatSize(image.SizeBytes)
+                    </MudText>
+                    @if (image.Width.HasValue)
+                    {
+                        <MudText Typo="Typo.body2">
+                            <strong>Dimensions:</strong> @image.Width x @image.Height
+                        </MudText>
+                    }
+                    <MudText Typo="Typo.body2">
+                        <strong>Imported:</strong> @image.CreatedAt.ToString("g")
+                    </MudText>
+                    @if (image.GitHubRepoUrl is not null)
+                    {
+                        <MudText Typo="Typo.body2">
+                            <strong>Source:</strong>
+                            <MudLink Href="@image.GitHubRepoUrl" Target="_blank">GitHub</MudLink>
+                        </MudText>
+                    }
+                    @if (image.AlbumNames.Any())
+                    {
+                        <MudDivider Class="my-3" />
+                        <MudText Typo="Typo.subtitle2">Albums</MudText>
+                        <MudChipSet T="string">
+                            @foreach (var name in image.AlbumNames)
+                            {
+                                <MudChip T="string" Color="Color.Primary">@name</MudChip>
+                            }
+                        </MudChipSet>
+                    }
+                    <MudDivider Class="my-3" />
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                               OnClick="ShowAlbumPicker" FullWidth="true" Class="mb-2">
+                        Add to Album
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Error"
+                               OnClick="DeleteImage" FullWidth="true">
+                        Delete Image
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+<MudDialog @bind-IsVisible="@albumPickerVisible">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Select Album</MudText>
+        <MudList T="string" Clickable="true">
+            @foreach (var album in albums)
+            {
+                <MudListItem T="string" OnClick="() => AddToAlbum(album.Id)">
+                    <MudText>@album.Name (@album.ImageCount)</MudText>
+                </MudListItem>
+            }
+        </MudList>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [Inject] private IGalleryClient Client { get; set; } = null!;
+    [Inject] private NavigationManager Nav { get; set; } = null!;
+
+    private ImageDto? image;
+    private List<AlbumDto> albums = new();
+    private bool albumPickerVisible;
+
+    private double filterGray;
+    private double filterSepia;
+    private double filterBrightness = 100;
+    private double filterContrast = 100;
+    private double filterBlur;
+    private double filterHue;
+    private double filterSaturate = 100;
+
+    protected override async Task OnInitializedAsync()
+    {
+        image = await Client.GetImageAsync(Id);
+        albums = await Client.GetAlbumsAsync();
+    }
+
+    private void ResetFilters()
+    {
+        filterGray = 0; filterSepia = 0; filterBrightness = 100;
+        filterContrast = 100; filterBlur = 0; filterHue = 0; filterSaturate = 100;
+    }
+
+    private string GetFilterStyle()
+    {
+        return $"grayscale({filterGray}%) sepia({filterSepia}%) brightness({filterBrightness}%) contrast({filterContrast}%) blur({filterBlur}px) hue-rotate({filterHue}deg) saturate({filterSaturate}%)";
+    }
+
+    private void ShowAlbumPicker() => albumPickerVisible = true;
+
+    private async Task AddToAlbum(Guid albumId)
+    {
+        await Client.AddImageToAlbumAsync(albumId, Id);
+        albumPickerVisible = false;
+        image = await Client.GetImageAsync(Id);
+    }
+
+    private async Task DeleteImage()
+    {
+        await Client.DeleteImageAsync(Id);
+        Nav.NavigateTo("/");
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+        _ => $"{bytes / (1024.0 * 1024.0):F1} MB"
+    };
+}

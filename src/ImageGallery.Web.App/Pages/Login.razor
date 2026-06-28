@@ -1,0 +1,17 @@
+@page "/login"
+@rendermode InteractiveServer
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Elevation="4" Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Custom.Brands.GitHub" Size="Size.Large" Color="Color.Default" />
+        <MudText Typo="Typo.h4" Class="my-4">Sign in with GitHub</MudText>
+        <MudText Typo="Typo.body1" Class="mb-6 text-secondary">
+            Connect your GitHub account to browse and import images from your repositories.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Default"
+                   Size="Size.Large" href="/api/auth/login">
+            <MudIcon Left="true" Icon="@Icons.Custom.Brands.GitHub" />
+            Sign in with GitHub
+        </MudButton>
+    </MudPaper>
+</MudContainer>

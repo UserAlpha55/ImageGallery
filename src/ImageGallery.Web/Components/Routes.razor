@@ -1,0 +1,12 @@
+﻿<Router AppAssembly="typeof(Program).Assembly"
+        AdditionalAssemblies="new[] { typeof(ImageGallery.Web.App.Pages.Gallery).Assembly }">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(ImageGallery.Web.Components.Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <RouteView RouteData="@null" DefaultLayout="typeof(ImageGallery.Web.Components.Layout.MainLayout)" />
+        <p role="alert">Sorry, there's nothing at this address.</p>
+    </NotFound>
+</Router>

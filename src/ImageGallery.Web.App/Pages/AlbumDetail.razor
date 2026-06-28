@@ -1,0 +1,154 @@
+@page "/albums/{Id:guid}"
+
+@rendermode InteractiveServer
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    @if (album is null)
+    {
+        <MudAlert Severity="Severity.Error">Album not found.</MudAlert>
+    }
+    else
+    {
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" Class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.h4">@album.Name</MudText>
+                    @if (album.Description is not null)
+                    {
+                        <MudText Typo="Typo.body2" Class="text-secondary">@album.Description</MudText>
+                    }
+                    <MudText Typo="Typo.caption">@album.Images.Count image@(album.Images.Count != 1 ? "s" : "")</MudText>
+                </div>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           OnClick="ToggleReorder">
+                    @(reorderMode ? "Done Reordering" : "Reorder")
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (!album.Images.Any())
+        {
+            <MudAlert Severity="Severity.Info">
+                This album is empty. Browse the gallery to add images.
+                <MudButton href="/" Color="Color.Primary">Go to Gallery</MudButton>
+            </MudAlert>
+        }
+        else if (reorderMode)
+        {
+            <div id="sortable-container" class="sortable-list">
+                @foreach (var img in album.Images.OrderBy(i => i.SortOrder))
+                {
+                    <div class="sortable-item" data-image-id="@img.ImageId" key="@img.ImageId">
+                        <MudPaper Elevation="2" Class="pa-2 d-flex align-center gap-4">
+                            <MudIcon Icon="@Icons.Material.Filled.DragHandle" Color="Color.Default" Class="drag-handle" />
+                            <img src="@img.Url" alt="@img.FileName" style="width:80px;height:60px;object-fit:cover" />
+                            <div class="flex-grow-1">
+                                <MudText Typo="Typo.body2">@img.FileName</MudText>
+                                <MudText Typo="Typo.caption">Order: @img.SortOrder</MudText>
+                            </div>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                           OnClick="() => RemoveImage(img.ImageId)" />
+                        </MudPaper>
+                    </div>
+                }
+            </div>
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4"
+                       OnClick="SaveReorder" FullWidth="true">
+                Save Order
+            </MudButton>
+        }
+        else
+        {
+            <MudGrid>
+                @foreach (var img in album.Images.OrderBy(i => i.SortOrder))
+                {
+                    <MudItem xs="6" sm="4" md="3" lg="2" key="@img.ImageId">
+                        <MudCard OnClick="() => OpenViewer(img)" Style="cursor:pointer">
+                            <img src="@img.Url" alt="@img.FileName"
+                                 style="width:100%;height:150px;object-fit:cover" loading="lazy" />
+                            <MudCardContent>
+                                <MudText Typo="Typo.caption" Class="text-truncate">@img.FileName</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    }
+</MudContainer>
+
+@if (viewerImage is not null)
+{
+    <ImageViewer Image="viewerImage" OnClose="() => viewerImage = null" />
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [Inject] private IGalleryClient Client { get; set; } = null!;
+    [Inject] private IJSRuntime JS { get; set; } = null!;
+
+    private AlbumDetailDto? album;
+    private bool reorderMode;
+    private AlbumImageDto? viewerImage;
+    private DotNetObjectReference<AlbumDetail>? objRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        album = await Client.GetAlbumAsync(Id);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await InitializeSortable();
+    }
+
+    private async Task InitializeSortable()
+    {
+        objRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("import", "/_content/ImageGallery.Web.App/js/sortableInterop.js");
+        await JS.InvokeVoidAsync("initSortable", "sortable-container", objRef, nameof(HandleReorder));
+    }
+
+    [JSInvokable]
+    public async Task HandleReorder(List<string> imageIds)
+    {
+        var items = imageIds.Select((id, i) => new ReorderItem
+        {
+            ImageId = Guid.Parse(id),
+            SortOrder = i + 1
+        }).ToList();
+
+        await Client.ReorderAlbumImagesAsync(Id, items);
+    }
+
+    private void ToggleReorder()
+    {
+        reorderMode = !reorderMode;
+        if (!reorderMode)
+            StateHasChanged();
+    }
+
+    private async Task SaveReorder()
+    {
+        reorderMode = false;
+        album = await Client.GetAlbumAsync(Id);
+    }
+
+    private async Task RemoveImage(Guid imageId)
+    {
+        await Client.RemoveImageFromAlbumAsync(Id, imageId);
+        album = await Client.GetAlbumAsync(Id);
+    }
+
+    private void OpenViewer(AlbumImageDto img)
+    {
+        viewerImage = img;
+    }
+
+    public void Dispose()
+    {
+        objRef?.Dispose();
+    }
+}

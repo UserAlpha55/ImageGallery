@@ -1,0 +1,248 @@
+@page "/"
+@rendermode InteractiveServer
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Image Gallery</MudText>
+
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="4">
+            <MudTextField @bind-Value="searchText"
+                          Placeholder="Search images..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          Clearable="true" />
+        </MudItem>
+        <MudItem xs="6" sm="3" md="2">
+            <MudSelect @bind-Value="selectedSort" Label="Sort" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("newest")">Newest</MudSelectItem>
+                <MudSelectItem Value="@("oldest")">Oldest</MudSelectItem>
+                <MudSelectItem Value="@("name")">Name A-Z</MudSelectItem>
+                <MudSelectItem Value="@("name_desc")">Name Z-A</MudSelectItem>
+                <MudSelectItem Value="@("size")">Largest</MudSelectItem>
+                <MudSelectItem Value="@("size_asc")">Smallest</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" sm="3" md="2">
+            <MudSelect @bind-Value="selectedAlbum" Label="Album" Variant="Variant.Outlined" Clearable="true">
+                @foreach (var album in albums)
+                {
+                    <MudSelectItem Value="@album.Id.ToString()">@album.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="12" md="4" Class="d-flex align-center gap-2">
+            <MudIconButton Icon="@Icons.Material.Filled.FilterAlt" Color="Color.Primary"
+                           OnClick="() => showFilters = !showFilters" />
+            <MudIconButton Icon="@Icons.Material.Filled.ViewModule" Color="Color.Default"
+                           OnClick="() => gridColumns = 3" />
+            <MudIconButton Icon="@Icons.Material.Filled.ViewCompact" Color="Color.Default"
+                           OnClick="() => gridColumns = 4" />
+            <MudIconButton Icon="@Icons.Material.Filled.ViewStream" Color="Color.Default"
+                           OnClick="() => gridColumns = 2" />
+            <MudTooltip Text="Import from GitHub">
+                <MudIconButton Icon="@Icons.Material.Filled.CloudDownload"
+                               Color="Color.Secondary"
+                               href="/import" />
+            </MudTooltip>
+        </MudItem>
+    </MudGrid>
+
+    @if (showFilters)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudText Typo="Typo.h6" Class="mb-2">Image Filters</MudText>
+            <MudGrid>
+                <MudItem xs="6" md="3">
+                    <MudSlider @bind-Value="filterGray" Min="0" Max="100" Immediate="true">
+                        <Label Content="@($"Grayscale ({filterGray}%)")" />
+                    </MudSlider>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudSlider @bind-Value="filterSepia" Min="0" Max="100" Immediate="true">
+                        <Label Content="@($"Sepia ({filterSepia}%)")" />
+                    </MudSlider>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudSlider @bind-Value="filterBrightness" Min="0" Max="200" Immediate="true">
+                        <Label Content="@($"Brightness ({filterBrightness}%)")" />
+                    </MudSlider>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudSlider @bind-Value="filterContrast" Min="0" Max="200" Immediate="true">
+                        <Label Content="@($"Contrast ({filterContrast}%)")" />
+                    </MudSlider>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudSlider @bind-Value="filterBlur" Min="0" Max="10" Immediate="true">
+                        <Label Content="@($"Blur ({filterBlur}px)")" />
+                    </MudSlider>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudSlider @bind-Value="filterHue" Min="0" Max="360" Immediate="true">
+                        <Label Content="@($"Hue Rotate ({filterHue}°)")" />
+                    </MudSlider>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudSlider @bind-Value="filterSaturate" Min="0" Max="200" Immediate="true">
+                        <Label Content="@($"Saturate ({filterSaturate}%)")" />
+                    </MudSlider>
+                </MudItem>
+                <MudItem xs="6" md="3" Class="d-flex align-center">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Warning"
+                               OnClick="ResetFilters" FullWidth="true">
+                        Reset Filters
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    }
+
+    @if (loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (!images.Any())
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4">
+            No images found.
+            <MudButton href="/import" Color="Color.Primary" Variant="Variant.Text">
+                Import from GitHub
+            </MudButton>
+        </MudAlert>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var image in images)
+            {
+                <MudItem xs="12" sm="6" md="@gridColumns" lg="@gridColumns" key="@image.Id">
+                    <MudCard OnClick="() => OpenViewer(image)" Class="gallery-card" Style="cursor:pointer">
+                        <div class="image-wrapper" style="filter: @GetFilterStyle()">
+                            <img src="@image.Url" alt="@image.FileName"
+                                 style="width:100%;height:220px;object-fit:cover" loading="lazy" />
+                            <div class="image-overlay">
+                                <MudIcon Icon="@Icons.Material.Filled.Fullscreen" />
+                            </div>
+                        </div>
+                        <MudCardContent>
+                            <MudText Typo="Typo.body2">@image.FileName</MudText>
+                            <MudText Typo="Typo.caption" Class="text-secondary">
+                                @(image.Width.HasValue ? $"{image.Width}x{image.Height}" : "?x?") · @FormatSize(image.SizeBytes)
+                            </MudText>
+                            @if (image.AlbumNames.Any())
+                            {
+                                <MudChipSet T="string">
+                                    @foreach (var name in image.AlbumNames.Take(2))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">@name</MudChip>
+                                    }
+                                    @if (image.AlbumNames.Count > 2)
+                                    {
+                                        <MudChip T="string" Size="Size.Small">+@(image.AlbumNames.Count - 2)</MudChip>
+                                    }
+                                </MudChipSet>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+@if (viewerImage is not null)
+{
+    <ImageViewer ImageUrl="@viewerImage.Url" FileName="@viewerImage.FileName"
+                 FilterStyle="@GetFilterStyle()"
+                 OnClose="() => viewerImage = null" />
+}
+
+@code {
+    [Inject] private IGalleryClient Client { get; set; } = null!;
+
+    private List<ImageDto> images = new();
+    private List<AlbumDto> albums = new();
+    private string? searchText;
+    private string selectedSort = "newest";
+    private string? selectedAlbum;
+    private bool loading = true;
+    private bool showFilters;
+    private int gridColumns = 4;
+    private ImageDto? viewerImage;
+
+    private double filterGray = 0;
+    private double filterSepia = 0;
+    private double filterBrightness = 100;
+    private double filterContrast = 100;
+    private double filterBlur = 0;
+    private double filterHue = 0;
+    private double filterSaturate = 100;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try
+        {
+            Guid? albumGuid = Guid.TryParse(selectedAlbum, out var g) ? g : null;
+            images = await Client.GetImagesAsync(searchText, selectedSort, albumGuid);
+            albums = await Client.GetAlbumsAsync();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task OnSearchChanged(string? value)
+    {
+        searchText = value;
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private async Task OnSortChanged(string value)
+    {
+        selectedSort = value;
+        await LoadData();
+    }
+
+    private async Task OnAlbumChanged(string? value)
+    {
+        selectedAlbum = value;
+        await LoadData();
+    }
+
+    private void OpenViewer(ImageDto image) => viewerImage = image;
+
+    private void ResetFilters()
+    {
+        filterGray = 0;
+        filterSepia = 0;
+        filterBrightness = 100;
+        filterContrast = 100;
+        filterBlur = 0;
+        filterHue = 0;
+        filterSaturate = 100;
+    }
+
+    private string GetFilterStyle()
+    {
+        return $"grayscale({filterGray}%) sepia({filterSepia}%) brightness({filterBrightness}%) contrast({filterContrast}%) blur({filterBlur}px) hue-rotate({filterHue}deg) saturate({filterSaturate}%)";
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        return bytes switch
+        {
+            < 1024 => $"{bytes} B",
+            < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+            _ => $"{bytes / (1024.0 * 1024.0):F1} MB"
+        };
+    }
+}
