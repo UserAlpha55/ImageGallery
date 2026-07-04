@@ -1,5 +1,8 @@
 @page "/"
 @rendermode InteractiveServer
+@inject PageState PageState
+@inject IGalleryClient Client
+@inject IDialogService Dialog
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
     <MudText Typo="Typo.h4" Class="mb-4">Image Gallery</MudText>
@@ -7,6 +10,7 @@
     <MudGrid Class="mb-4">
         <MudItem xs="12" sm="6" md="4">
             <MudTextField @bind-Value="searchText"
+                          @bind-Value:after="() => OnSearchChanged(searchText)"
                           Placeholder="Search images..."
                           Adornment="Adornment.Start"
                           AdornmentIcon="@Icons.Material.Filled.Search"
@@ -14,7 +18,7 @@
                           Clearable="true" />
         </MudItem>
         <MudItem xs="6" sm="3" md="2">
-            <MudSelect @bind-Value="selectedSort" Label="Sort" Variant="Variant.Outlined">
+            <MudSelect @bind-Value="selectedSort" @bind-Value:after="() => OnSortChanged(selectedSort)" Label="Sort" Variant="Variant.Outlined">
                 <MudSelectItem Value="@("newest")">Newest</MudSelectItem>
                 <MudSelectItem Value="@("oldest")">Oldest</MudSelectItem>
                 <MudSelectItem Value="@("name")">Name A-Z</MudSelectItem>
@@ -24,7 +28,7 @@
             </MudSelect>
         </MudItem>
         <MudItem xs="6" sm="3" md="2">
-            <MudSelect @bind-Value="selectedAlbum" Label="Album" Variant="Variant.Outlined" Clearable="true">
+            <MudSelect @bind-Value="selectedAlbum" @bind-Value:after="() => OnAlbumChanged(selectedAlbum)" Label="Album" Variant="Variant.Outlined" Clearable="true">
                 @foreach (var album in albums)
                 {
                     <MudSelectItem Value="@album.Id.ToString()">@album.Name</MudSelectItem>
@@ -47,6 +51,27 @@
             </MudTooltip>
         </MudItem>
     </MudGrid>
+
+    @* Selected count + action bar *@
+    @if (selectedIds.Count > 0)
+    {
+        <MudPaper Elevation="4" Class="pa-4 mb-4 d-flex align-center gap-4">
+            <MudText Typo="Typo.body1">
+                <strong>@selectedIds.Count</strong> image@(selectedIds.Count != 1 ? "s" : "") selected
+            </MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="ShowAddToAlbumDialog"
+                       Disabled="selectedIds.Count == 0">
+                <MudIcon Left="true" Icon="@Icons.Material.Filled.AddToPhotos" />
+                Add to Album
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                       OnClick="ClearSelection">
+                Clear Selection
+            </MudButton>
+        </MudPaper>
+    }
 
     @if (showFilters)
     {
@@ -117,13 +142,22 @@
             @foreach (var image in images)
             {
                 <MudItem xs="12" sm="6" md="@gridColumns" lg="@gridColumns" key="@image.Id">
-                    <MudCard OnClick="() => OpenViewer(image)" Class="gallery-card" Style="cursor:pointer">
-                        <div class="image-wrapper" style="filter: @GetFilterStyle()">
+                    <MudCard Class="gallery-card" Style="cursor:pointer">
+                        <MudCardActions Class="d-flex justify-space-between pa-2">
+                            <MudCheckBox T="bool"
+                                         CheckedIcon="@Icons.Material.Filled.CheckCircle"
+                                         UncheckedIcon="@Icons.Material.Outlined.Circle"
+                                         Color="Color.Primary"
+                                         Checked="@selectedIds.Contains(image.Id)"
+                                         CheckedChanged="(bool c) => ToggleSelection(image.Id, c)"
+                                         Size="Size.Medium" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Fullscreen" Size="Size.Small"
+                                           OnClick="() => OpenViewer(image)" />
+                        </MudCardActions>
+                        <div class="image-wrapper" style="filter: @GetFilterStyle()"
+                             @onclick="() => OpenViewer(image)">
                             <img src="@image.Url" alt="@image.FileName"
-                                 style="width:100%;height:220px;object-fit:cover" loading="lazy" />
-                            <div class="image-overlay">
-                                <MudIcon Icon="@Icons.Material.Filled.Fullscreen" />
-                            </div>
+                                 style="width:100%;height:200px;object-fit:cover" loading="lazy" />
                         </div>
                         <MudCardContent>
                             <MudText Typo="Typo.body2">@image.FileName</MudText>
@@ -158,9 +192,34 @@
                  OnClose="() => viewerImage = null" />
 }
 
-@code {
-    [Inject] private IGalleryClient Client { get; set; } = null!;
+@* Add to Album dialog *@
+<MudDialog @bind-IsVisible="@addToAlbumDialogVisible">
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">
+            Add @selectedIds.Count image@(selectedIds.Count != 1 ? "s" : "") to album
+        </MudText>
+        <MudList T="string" Clickable="true">
+            @foreach (var album in albums)
+            {
+                <MudListItem T="string" OnClick="() => AddToAlbum(album.Id)">
+                    <MudText>@album.Name (@album.ImageCount images)</MudText>
+                </MudListItem>
+            }
+        </MudList>
+        @if (!albums.Any())
+        {
+            <MudAlert Severity="Severity.Warning">
+                No albums yet.
+                <MudButton Href="/albums" Color="Color.Primary">Create one</MudButton>
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => addToAlbumDialogVisible = false">Cancel</MudButton>
+    </DialogActions>
+</MudDialog>
 
+@code {
     private List<ImageDto> images = new();
     private List<AlbumDto> albums = new();
     private string? searchText;
@@ -170,6 +229,8 @@
     private bool showFilters;
     private int gridColumns = 4;
     private ImageDto? viewerImage;
+    private HashSet<Guid> selectedIds = new();
+    private bool addToAlbumDialogVisible;
 
     private double filterGray = 0;
     private double filterSepia = 0;
@@ -181,7 +242,24 @@
 
     protected override async Task OnInitializedAsync()
     {
+        RestoreState();
         await LoadData();
+    }
+
+    private void RestoreState()
+    {
+        searchText = PageState.GallerySearch;
+        selectedSort = PageState.GallerySort;
+        selectedAlbum = PageState.GalleryAlbum;
+        selectedIds = PageState.SelectedImageIds;
+    }
+
+    private void PersistState()
+    {
+        PageState.GallerySearch = searchText;
+        PageState.GallerySort = selectedSort;
+        PageState.GalleryAlbum = selectedAlbum;
+        PageState.SelectedImageIds = selectedIds;
     }
 
     private async Task LoadData()
@@ -202,6 +280,7 @@
     private async Task OnSearchChanged(string? value)
     {
         searchText = value;
+        PersistState();
         await LoadData();
         StateHasChanged();
     }
@@ -209,13 +288,50 @@
     private async Task OnSortChanged(string value)
     {
         selectedSort = value;
+        PersistState();
         await LoadData();
     }
 
     private async Task OnAlbumChanged(string? value)
     {
         selectedAlbum = value;
+        PersistState();
         await LoadData();
+    }
+
+    private void ClearSelection()
+    {
+        selectedIds.Clear();
+        PersistState();
+    }
+
+    private void ShowAddToAlbumDialog()
+    {
+        addToAlbumDialogVisible = true;
+    }
+
+    private async Task AddToAlbum(Guid albumId)
+    {
+        addToAlbumDialogVisible = false;
+        var count = 0;
+        foreach (var imageId in selectedIds)
+        {
+            try
+            {
+                await Client.AddImageToAlbumAsync(albumId, imageId);
+                count++;
+            }
+            catch { }
+        }
+        ClearSelection();
+        await LoadData();
+    }
+
+    private void ToggleSelection(Guid imageId, bool selected)
+    {
+        if (selected) selectedIds.Add(imageId);
+        else selectedIds.Remove(imageId);
+        PersistState();
     }
 
     private void OpenViewer(ImageDto image) => viewerImage = image;

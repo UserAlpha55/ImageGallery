@@ -23,6 +23,11 @@
                            OnClick="ToggleReorder">
                     @(reorderMode ? "Done Reordering" : "Reorder")
                 </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary"
+                           href="@($"/?selectForAlbum={Id}")">
+                    <MudIcon Left="true" Icon="@Icons.Material.Filled.AddToPhotos" />
+                    Add from Gallery
+                </MudButton>
             </MudItem>
         </MudGrid>
 
@@ -75,6 +80,10 @@
                 }
             </MudGrid>
         }
+
+        <MudText Typo="Typo.caption" Class="text-secondary mt-8">
+            Albums are stored in the SQLite database (ImageGallery.db)
+        </MudText>
     }
 </MudContainer>
 

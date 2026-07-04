@@ -24,16 +24,17 @@ public class GitHubImportService : IGitHubImportService
 
     public async Task<List<GitHubFileDto>> PreviewRepoAsync(string repoUrl, string? path, string? branch)
     {
-        var (owner, repo) = ParseRepoUrl(repoUrl);
-        if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(repo))
+        var parsed = ParseGitHubUrl(repoUrl);
+        if (parsed.owner is null || parsed.repo is null)
             return new List<GitHubFileDto>();
 
-        path ??= string.Empty;
-        branch ??= "main";
+        // Use provided path/branch, fall back to parsed from URL, then defaults
+        path ??= parsed.path ?? string.Empty;
+        branch ??= parsed.branch ?? "main";
 
         try
         {
-            var contents = await _client.Repository.Content.GetAllContents(owner, repo, path);
+            var contents = await _client.Repository.Content.GetAllContents(parsed.owner, parsed.repo, path);
             var imageFiles = contents
                 .Where(c => c.Type == ContentType.File && ImageExtensions.Contains(Path.GetExtension(c.Name)))
                 .Select(c => new GitHubFileDto
@@ -51,17 +52,42 @@ public class GitHubImportService : IGitHubImportService
         }
     }
 
-    private static (string? owner, string? repo) ParseRepoUrl(string url)
+    private static (string? owner, string? repo, string? branch, string? path) ParseGitHubUrl(string url)
     {
         try
         {
             var uri = new Uri(url);
             var segments = uri.AbsolutePath.Trim('/').Split('/');
-            if (segments.Length >= 2)
-                return (segments[0], segments[1]);
-        }
-        catch { }
+            if (segments.Length < 2)
+                return (null, null, null, null);
 
-        return (null, null);
+            var owner = segments[0];
+            var repo = segments[1];
+
+            // URL patterns:
+            //   https://github.com/owner/repo
+            //   https://github.com/owner/repo/tree/branch/path
+            //   https://github.com/owner/repo/blob/branch/path
+            //   https://github.com/owner/repo/tree/branch
+            string? branch = null;
+            string? path = null;
+
+            if (segments.Length > 2)
+            {
+                var type = segments[2]; // "tree" or "blob"
+                if (type is "tree" or "blob" && segments.Length > 3)
+                {
+                    branch = segments[3];
+                    if (segments.Length > 4)
+                        path = string.Join("/", segments.Skip(4));
+                }
+            }
+
+            return (owner, repo, branch, path);
+        }
+        catch
+        {
+            return (null, null, null, null);
+        }
     }
 }
