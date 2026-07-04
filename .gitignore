@@ -25,6 +25,10 @@ packages/
 *.db-shm
 *.db-wal
 
+# Configuration with secrets
+src/ImageGallery.API/appsettings.Development.json
+src/ImageGallery.Web/appsettings.Development.json
+
 # IDE
 .idea/
 *.swp
