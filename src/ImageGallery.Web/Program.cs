@@ -17,7 +17,6 @@ builder.Services.AddMudServices();
 builder.Services.AddScoped<AuthStateService>();
 
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5231";
-
 builder.Services.AddHttpClient<IGalleryClient, GalleryClient>(client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);

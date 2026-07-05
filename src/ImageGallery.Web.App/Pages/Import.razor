@@ -1,26 +1,45 @@
 @page "/import"
 @rendermode InteractiveServer
 @attribute [StreamRendering]
+@inject PageState PageState
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
     <MudText Typo="Typo.h4" Class="mb-4">Import from GitHub</MudText>
 
+    <MudAlert Severity="Severity.Info" Class="mb-4" Dismissible="true">
+        <strong>Quick start:</strong> Paste a GitHub repo URL like
+        <code>https://github.com/yavuzceliker/sample-images/tree/main/docs</code>
+        and the path + branch are filled automatically. Then click Preview.
+    </MudAlert>
+
     <MudPaper Elevation="2" Class="pa-4 mb-4">
         <MudGrid>
             <MudItem xs="12" md="6">
-                <MudTextField @bind-Value="repoUrl" Label="GitHub Repository URL"
-                              Placeholder="https://github.com/owner/repo"
+                <MudTextField @bind-Value="repoUrl"
+                              @bind-Value:after="OnRepoUrlChanged"
+                              Label="GitHub Repository URL"
+                              Placeholder="https://github.com/owner/repo or https://github.com/owner/repo/tree/branch/path"
                               Variant="Variant.Outlined" FullWidth="true" />
             </MudItem>
             <MudItem xs="6" md="3">
-                <MudTextField @bind-Value="repoPath" Label="Path (optional)"
-                              Placeholder="e.g. assets/images"
+                <MudTextField @bind-Value="repoPath"
+                              @bind-Value:after="() => PageState.ImportRepoPath = repoPath"
+                              Label="Path (auto-filled)"
+                              Placeholder="e.g. docs/images"
                               Variant="Variant.Outlined" FullWidth="true" />
             </MudItem>
-            <MudItem xs="6" md="3" Class="d-flex align-end">
+            <MudItem xs="6" md="3">
+                <MudTextField @bind-Value="repoBranch"
+                              Label="Branch (auto-filled)"
+                              Placeholder="main"
+                              Variant="Variant.Outlined" FullWidth="true" />
+            </MudItem>
+        </MudGrid>
+        <MudGrid>
+            <MudItem xs="12" Class="d-flex justify-end">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary"
                            OnClick="PreviewRepo" Disabled="string.IsNullOrWhiteSpace(repoUrl) || previewing"
-                           FullWidth="true" Class="mb-4 mb-md-0">
+                           FullWidth="true" Class="mt-2">
                     @(previewing ? "Loading..." : "Preview")
                     @if (previewing)
                     {
@@ -54,7 +73,7 @@
             </MudGrid>
 
             <MudGrid>
-                @foreach (var file in previewFiles)
+                @foreach (var file in previewFiles.Take(50))
                 {
                     <MudItem xs="6" sm="4" md="3" lg="2" key="@file.Name">
                         <MudCard>
@@ -82,15 +101,45 @@
 
 @code {
     [Inject] private IGalleryClient Client { get; set; } = null!;
-    [Inject] private NavigationManager Nav { get; set; } = null!;
 
     private string repoUrl = string.Empty;
     private string? repoPath;
+    private string repoBranch = "main";
     private List<GitHubFileDto> previewFiles = new();
     private bool previewing;
     private bool importing;
     private string? errorMessage;
     private int importedCount;
+
+    protected override void OnInitialized()
+    {
+        if (PageState.ImportRepoUrl is not null)
+            repoUrl = PageState.ImportRepoUrl;
+        if (PageState.ImportRepoPath is not null)
+            repoPath = PageState.ImportRepoPath;
+    }
+
+    private void OnRepoUrlChanged()
+    {
+        PageState.ImportRepoUrl = repoUrl;
+        AutoFillFromUrl(repoUrl);
+    }
+
+    private void AutoFillFromUrl(string url)
+    {
+        try
+        {
+            var uri = new Uri(url);
+            var segments = uri.AbsolutePath.Trim('/').Split('/');
+            if (segments.Length >= 4 && segments[2] is "tree" or "blob")
+            {
+                repoBranch = segments[3];
+                if (segments.Length > 4)
+                    repoPath = string.Join("/", segments.Skip(4));
+            }
+        }
+        catch { }
+    }
 
     private async Task PreviewRepo()
     {
@@ -103,11 +152,12 @@
             previewFiles = await Client.PreviewGitHubRepoAsync(new ImportRequest
             {
                 RepoUrl = repoUrl,
-                Path = string.IsNullOrWhiteSpace(repoPath) ? null : repoPath
+                Path = string.IsNullOrWhiteSpace(repoPath) ? null : repoPath,
+                Branch = string.IsNullOrWhiteSpace(repoBranch) ? null : repoBranch
             });
 
             if (!previewFiles.Any())
-                errorMessage = "No image files found at that location.";
+                errorMessage = "No image files found at that location. Check the URL, path, and branch.";
         }
         catch (Exception ex)
         {
