@@ -11,6 +11,8 @@ public class Image
     public long SizeBytes { get; set; }
     public string? GitHubRepoUrl { get; set; }
     public string? GitHubPath { get; set; }
+    public string? Source { get; set; }
+    public string? ThumbnailUrl { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<AlbumImage> AlbumImages { get; set; } = new List<AlbumImage>();

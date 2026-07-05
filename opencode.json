@@ -1,0 +1,5 @@
+{
+  "prompts": [
+    "Never commit, push, or create PRs unless I explicitly ask you to."
+  ]
+}

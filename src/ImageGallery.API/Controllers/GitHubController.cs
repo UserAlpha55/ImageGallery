@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ImageGallery.Application.Services;
 using ImageGallery.Contracts;
 
 namespace ImageGallery.API.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class GitHubController : ControllerBase

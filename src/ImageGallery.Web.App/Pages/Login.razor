@@ -1,17 +1,55 @@
 @page "/login"
 @rendermode InteractiveServer
+@inject AuthStateService AuthState
+@inject NavigationManager Navigation
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
     <MudPaper Elevation="4" Class="pa-8 text-center">
-        <MudIcon Icon="@Icons.Custom.Brands.GitHub" Size="Size.Large" Color="Color.Default" />
-        <MudText Typo="Typo.h4" Class="my-4">Sign in with GitHub</MudText>
-        <MudText Typo="Typo.body1" Class="mb-6 text-secondary">
-            Connect your GitHub account to browse and import images from your repositories.
-        </MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Default"
-                   Size="Size.Large" href="/api/auth/login">
-            <MudIcon Left="true" Icon="@Icons.Custom.Brands.GitHub" />
-            Sign in with GitHub
-        </MudButton>
+        @if (AuthState.IsAuthenticated)
+        {
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Success" />
+            <MudText Typo="Typo.h4" Class="my-4">You are signed in</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="@HandleLogout">
+                Sign Out
+            </MudButton>
+        }
+        else
+        {
+            <MudIcon Icon="@Icons.Custom.Brands.GitHub" Size="Size.Large" Color="Color.Default" />
+            <MudText Typo="Typo.h4" Class="my-4">Sign in with GitHub</MudText>
+            <MudText Typo="Typo.body1" Class="mb-6 text-secondary">
+                Connect your GitHub account to browse and import images from your repositories.
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Default"
+                       Size="Size.Large" OnClick="@HandleLogin">
+                <MudIcon Left="true" Icon="@Icons.Custom.Brands.GitHub" />
+                Sign in with GitHub
+            </MudButton>
+        }
     </MudPaper>
 </MudContainer>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? AccessToken { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(AccessToken))
+        {
+            AuthState.SetToken(AccessToken);
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        Navigation.NavigateTo("/api/auth/login-url", forceLoad: true);
+    }
+
+    private void HandleLogout()
+    {
+        AuthState.Logout();
+    }
+}

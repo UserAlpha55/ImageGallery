@@ -1,4 +1,7 @@
 ﻿@inherits LayoutComponentBase
+@using ImageGallery.Web.App.Services
+@inject AuthStateService AuthState
+@implements IDisposable
 
 <MudThemeProvider />
 <MudDialogProvider />
@@ -22,8 +25,17 @@
                            OnClick="@((e) => drawerOpen = !drawerOpen)" />
             <MudText Typo="Typo.h6" Class="ms-2">ImageGallery</MudText>
             <MudSpacer />
-            <MudIconButton Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit"
-                           href="/login" />
+            @if (AuthState.IsAuthenticated)
+            {
+                <MudText Class="mr-2" Typo="Typo.body2">Signed in</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Logout" Color="Color.Inherit"
+                               OnClick="@HandleLogout" />
+            }
+            else
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit"
+                               href="/login" />
+            }
         </MudAppBar>
 
         <div class="mt-16">
@@ -34,4 +46,19 @@
 
 @code {
     private bool drawerOpen = true;
+
+    protected override void OnInitialized()
+    {
+        AuthState.OnAuthStateChanged += StateHasChanged;
+    }
+
+    private void HandleLogout()
+    {
+        AuthState.Logout();
+    }
+
+    public void Dispose()
+    {
+        AuthState.OnAuthStateChanged -= StateHasChanged;
+    }
 }

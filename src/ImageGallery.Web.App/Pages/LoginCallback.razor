@@ -1,0 +1,38 @@
+@page "/login-callback"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8 text-center">
+    <MudText Typo="Typo.h6">Completing sign in...</MudText>
+    <MudProgressCircular Indeterminate="true" Class="mt-4" />
+</MudContainer>
+
+@code {
+    private IJSObjectReference? _module;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import",
+                "./_content/ImageGallery.Web.App/login-callback.js");
+            var token = await _module.InvokeAsync<string?>("getAccessToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Navigation.NavigateTo($"/login?access_token={Uri.EscapeDataString(token)}", forceLoad: true);
+            }
+            else
+            {
+                Navigation.NavigateTo("/login?error=no_token");
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+            await _module.DisposeAsync();
+    }
+}
